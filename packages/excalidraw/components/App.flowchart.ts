@@ -12,6 +12,8 @@ import {
 
 import type {
   ExcalidrawElement,
+  ExcalidrawFlowchartNodeElement,
+  NonDeleted,
   NonDeletedExcalidrawElement,
 } from "@excalidraw/element/types";
 
@@ -33,6 +35,7 @@ type FlowchartOperation =
 export class AppFlowchart {
   private creator = new FlowChartCreator();
   private navigator = new FlowChartNavigator();
+  private pointerCreationInProgress = false;
 
   constructor(private app: App) {}
 
@@ -48,6 +51,44 @@ export class AppFlowchart {
   clear = () => {
     this.creator.clear();
     this.navigator.clear();
+    this.pointerCreationInProgress = false;
+  };
+
+  beginPointerCreation = (
+    node: NonDeleted<ExcalidrawFlowchartNodeElement>,
+    direction: LinkDirection,
+  ) => {
+    this.creator.createNodes(node, this.app.state, direction, this.app.scene);
+    this.pointerCreationInProgress = true;
+    this.app.triggerRender(true);
+  };
+
+  cancelPointerCreation = () => {
+    if (!this.pointerCreationInProgress) {
+      return;
+    }
+    this.creator.clear();
+    this.pointerCreationInProgress = false;
+    this.app.triggerRender(true);
+  };
+
+  finishPointerCreation = () => {
+    if (!this.pointerCreationInProgress) {
+      return;
+    }
+
+    const nodes = this.creator.pendingNodes ?? [];
+    this.creator.clear();
+    this.pointerCreationInProgress = false;
+
+    if (nodes.length) {
+      this.app.insertNewElements(nodes);
+      const firstNode = nodes[0];
+      if (firstNode) {
+        this.selectAndReveal(firstNode);
+      }
+      this.captureUpdate();
+    }
   };
 
   handleKeyEvent = (event: React.KeyboardEvent | KeyboardEvent): boolean => {

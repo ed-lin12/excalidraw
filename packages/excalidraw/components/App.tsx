@@ -641,6 +641,20 @@ const gesture: Gesture = {
   initialScale: null,
 };
 
+const ONE_CLICK_CAT_SVG = `<svg xmlns="http://www.w3.org/2000/svg" width="240" height="240" viewBox="0 0 240 240">
+  <g stroke="#49352b" stroke-width="5" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M170 190 Q225 190 213 139" fill="none" stroke="#e5a34a" stroke-width="20"/>
+    <ellipse cx="120" cy="169" rx="54" ry="53" fill="#f4bb65"/>
+    <path d="M65 90 L60 35 L100 62 Q120 52 140 62 L180 35 L175 90 Q195 150 120 153 Q45 150 65 90Z" fill="#f4bb65"/>
+    <path d="M75 75 L73 56 L90 69 M150 69 L167 56 L165 75" fill="#ef9d9e" stroke="none"/>
+    <path d="M91 103 Q98 95 105 103 M135 103 Q142 95 149 103" fill="none"/>
+    <path d="M113 116 L127 116 L120 123Z" fill="#bf7178" stroke="none"/>
+    <path d="M120 123 Q110 137 102 126 M120 123 Q130 137 138 126" fill="none"/>
+    <path d="M83 118 L44 110 M83 128 L44 135 M157 118 L196 110 M157 128 L196 135" fill="none" stroke-width="3"/>
+    <path d="M97 196 L97 213 M143 196 L143 213" fill="none"/>
+  </g>
+</svg>`;
+
 class App extends React.Component<AppProps, AppState> {
   canvas: AppClassProperties["canvas"];
   interactiveCanvas: AppClassProperties["interactiveCanvas"] = null;
@@ -2631,6 +2645,30 @@ class App extends React.Component<AppProps, AppState> {
                                   }}
                                 />
                               </ElementCanvasButtons>
+                            )}
+
+                          {this.isDefaultUIEnabled() &&
+                            !this.state.viewModeEnabled &&
+                            this.isToolSupported("image") && (
+                              <button
+                                type="button"
+                                data-testid="add-cat-button"
+                                onClick={this.onAddCatClick}
+                                style={{
+                                  position: "absolute",
+                                  right: 16,
+                                  bottom: 64,
+                                  padding: "10px 16px",
+                                  borderRadius: 12,
+                                  border: "1px solid var(--color-primary)",
+                                  background: "var(--island-bg-color)",
+                                  color: "var(--color-on-primary-container)",
+                                  cursor: "pointer",
+                                  zIndex: 5,
+                                }}
+                              >
+                                Add cat
+                              </button>
                             )}
 
                           {this.isDefaultUIEnabled() && this.state.contextMenu && (
@@ -13100,6 +13138,22 @@ class App extends React.Component<AppProps, AppState> {
         },
       );
     }
+  };
+
+  private onAddCatClick = async () => {
+    const { x, y } = viewportCoordsToSceneCoords(
+      {
+        clientX: this.state.width / 2 + this.state.offsetLeft,
+        clientY: this.state.height / 2 + this.state.offsetTop,
+      },
+      this.state,
+    );
+
+    await this.insertImages(
+      [SVGStringToFile(ONE_CLICK_CAT_SVG, "cat.svg")],
+      x,
+      y,
+    );
   };
 
   private getImageNaturalDimensions = (

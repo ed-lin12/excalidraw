@@ -1,6 +1,7 @@
 import { KEYS, reseed } from "@excalidraw/common";
 
 import { Excalidraw } from "@excalidraw/excalidraw";
+import { isArrowElement } from "@excalidraw/element";
 
 import { API } from "@excalidraw/excalidraw/tests/helpers/api";
 import { UI, Keyboard, Pointer } from "@excalidraw/excalidraw/tests/helpers/ui";
@@ -43,6 +44,27 @@ describe("flow chart creation", () => {
 
     API.setElements([rectangle]);
     API.setSelectedElements([rectangle]);
+  });
+
+  it("adds a connected node from the contextual direction picker", () => {
+    const initialNode = h.elements[0];
+
+    UI.clickByTitle("Add step");
+    UI.clickOnTestId("flowchart-add-step-right");
+
+    expect(h.elements.filter((el) => el.type === "rectangle").length).toBe(2);
+    expect(h.elements.filter((el) => el.type === "arrow").length).toBe(1);
+
+    const addedNode = h.elements.find(
+      (el) => el.type === "rectangle" && el.id !== initialNode.id,
+    );
+    const bindingArrow = h.elements.find(isArrowElement);
+
+    expect(addedNode?.x).toBe(initialNode.x + initialNode.width + 100);
+    expect(bindingArrow?.startBinding?.elementId).toBe(initialNode.id);
+    expect(bindingArrow?.endBinding?.elementId).toBe(addedNode?.id);
+    expect(h.state.selectedElementIds[addedNode!.id]).toBe(true);
+    expect(API.getUndoStack()).toHaveLength(1);
   });
 
   // multiple at once

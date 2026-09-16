@@ -44,6 +44,36 @@ export class AppFlowchart {
     return this.creator.isCreatingChart;
   }
 
+  addNode = (
+    startNode: NonDeletedExcalidrawElement,
+    direction: LinkDirection,
+  ) => {
+    if (!isFlowchartNodeElement(startNode)) {
+      return;
+    }
+
+    // A contextual action commits one node immediately, so it should not
+    // leave keyboard-driven preview state behind.
+    this.creator.clear();
+    this.creator.createNodes(
+      startNode,
+      this.app.state,
+      direction,
+      this.app.scene,
+    );
+
+    const nodes = this.creator.pendingNodes ?? [];
+    this.creator.clear();
+
+    if (!nodes.length) {
+      return;
+    }
+
+    this.app.insertNewElements(nodes);
+    this.selectAndReveal(nodes[0]);
+    this.captureUpdate();
+  };
+
   /** ends any in-progress flowchart creation/navigation session */
   clear = () => {
     this.creator.clear();

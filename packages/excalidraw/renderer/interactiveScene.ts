@@ -31,6 +31,7 @@ import {
   getOmitSidesForEditorInterface,
   getTransformHandles,
   getTransformHandlesFromCoords,
+  getFlowchartHandles,
   hasBoundingBox,
   hitElementItself,
   isArrowElement,
@@ -38,6 +39,7 @@ import {
   isElbowArrow,
   isFrameLikeElement,
   isImageElement,
+  isFlowchartNodeElement,
   isLinearElement,
   isLineElement,
   maxBindingDistance_simple,
@@ -1460,6 +1462,87 @@ const renderTransformHandles = (
   });
 };
 
+const renderFlowchartHandles = (
+  context: CanvasRenderingContext2D,
+  renderConfig: InteractiveCanvasRenderConfig,
+  appState: InteractiveCanvasAppState,
+  element: ExcalidrawElement,
+): void => {
+  if (
+    !isFlowchartNodeElement(element) ||
+    (element.type !== "rectangle" && element.type !== "diamond")
+  ) {
+    return;
+  }
+
+  const handles = getFlowchartHandles(element, appState.zoom);
+  const selectionColor = renderConfig.selectionColor;
+  const vectors = {
+    up: [0, -1],
+    right: [1, 0],
+    down: [0, 1],
+    left: [-1, 0],
+  } as const;
+
+  Object.entries(handles).forEach(([direction, handle]) => {
+    if (!handle) {
+      return;
+    }
+
+    const [x, y, width, height] = handle;
+    const centerX = x + width / 2;
+    const centerY = y + height / 2;
+    const [localX, localY] = vectors[direction as keyof typeof vectors];
+    const cos = Math.cos(element.angle);
+    const sin = Math.sin(element.angle);
+    const vectorX = localX * cos - localY * sin;
+    const vectorY = localX * sin + localY * cos;
+    const arrowLength = Math.min(width, height) * 0.28;
+
+    context.save();
+    context.fillStyle = getThemedColor("#fff", appState.theme);
+    context.strokeStyle = selectionColor;
+    context.lineWidth = 1 / appState.zoom.value;
+    if (context.roundRect) {
+      context.beginPath();
+      context.roundRect(x, y, width, height, 2 / appState.zoom.value);
+      context.fill();
+      context.stroke();
+    } else {
+      context.fillRect(x, y, width, height);
+      context.strokeRect(x, y, width, height);
+    }
+
+    context.beginPath();
+    context.moveTo(
+      centerX - vectorX * arrowLength,
+      centerY - vectorY * arrowLength,
+    );
+    context.lineTo(
+      centerX + vectorX * arrowLength,
+      centerY + vectorY * arrowLength,
+    );
+    context.moveTo(
+      centerX + vectorX * arrowLength,
+      centerY + vectorY * arrowLength,
+    );
+    context.lineTo(
+      centerX + vectorX * arrowLength - vectorY * arrowLength,
+      centerY + vectorY * arrowLength + vectorX * arrowLength,
+    );
+    context.moveTo(
+      centerX + vectorX * arrowLength,
+      centerY + vectorY * arrowLength,
+    );
+    context.lineTo(
+      centerX + vectorX * arrowLength + vectorY * arrowLength,
+      centerY + vectorY * arrowLength - vectorX * arrowLength,
+    );
+    context.stroke();
+    context.restore();
+  });
+};
+
 const renderCropHandles = (
   context: CanvasRenderingContext2D,
   renderConfig: InteractiveCanvasRenderConfig,
@@ -2008,6 +2091,19 @@ const _renderInteractiveScene = ({
           appState,
           transformHandles,
           selectedElements[0].angle,
+        );
+      }
+      if (
+        !appState.viewModeEnabled &&
+        showBoundingBox &&
+        !isTextElement(appState.editingTextElement) &&
+        !appState.croppingElementId
+      ) {
+        renderFlowchartHandles(
+          context,
+          renderConfig,
+          appState,
+          selectedElements[0],
         );
       }
 

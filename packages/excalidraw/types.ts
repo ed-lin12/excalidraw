@@ -7,7 +7,7 @@ import type {
   StrokeWidthKey,
 } from "@excalidraw/common";
 
-import type { LinearElementEditor } from "@excalidraw/element";
+import type { LinearElementEditor, LinkDirection } from "@excalidraw/element";
 
 import type { MaybeTransformHandleType } from "@excalidraw/element";
 
@@ -1235,6 +1235,7 @@ export type PointerDownState = Readonly<{
     arrowDirection: "origin" | "end";
     // This is a center point of selected elements determined on the initial pointer down event (for rotation only)
     center: { x: number; y: number };
+    flowchartDirection: LinkDirection | null;
   };
   hit: {
     // The element the pointer is "hitting", is determined on the initial

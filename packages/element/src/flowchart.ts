@@ -4,6 +4,7 @@ import {
   clamp,
   type GlobalPoint,
   pointFrom,
+  pointRotateRads,
   type LocalPoint,
 } from "@excalidraw/math";
 
@@ -53,6 +54,70 @@ import {
 import type { Scene } from "./Scene";
 
 export type LinkDirection = "up" | "right" | "down" | "left";
+export type FlowchartHandles = Partial<Record<LinkDirection, Bounds>>;
+
+const FLOWCHART_HANDLE_SIZE = 12;
+const FLOWCHART_HANDLE_OFFSET = 26;
+
+export const getFlowchartHandles = (
+  element: ExcalidrawFlowchartNodeElement,
+  zoom: { value: number },
+): FlowchartHandles => {
+  const size = FLOWCHART_HANDLE_SIZE / zoom.value;
+  const center = pointFrom(
+    element.x + element.width / 2,
+    element.y + element.height / 2,
+  );
+  const createHandle = (x: number, y: number): Bounds => {
+    const [rotatedX, rotatedY] = pointRotateRads(
+      pointFrom(x, y),
+      center,
+      element.angle,
+    );
+    return [rotatedX - size / 2, rotatedY - size / 2, size, size];
+  };
+
+  return {
+    up: createHandle(
+      center[0],
+      element.y - FLOWCHART_HANDLE_OFFSET / zoom.value,
+    ),
+    right: createHandle(
+      element.x + element.width + FLOWCHART_HANDLE_OFFSET / zoom.value,
+      center[1],
+    ),
+    down: createHandle(
+      center[0],
+      element.y + element.height + FLOWCHART_HANDLE_OFFSET / zoom.value,
+    ),
+    left: createHandle(
+      element.x - FLOWCHART_HANDLE_OFFSET / zoom.value,
+      center[1],
+    ),
+  };
+};
+
+export const getFlowchartHandleDirectionAtCoords = (
+  element: ExcalidrawFlowchartNodeElement,
+  zoom: { value: number },
+  x: number,
+  y: number,
+): LinkDirection | null => {
+  const handles = getFlowchartHandles(element, zoom);
+  for (const direction of ["up", "right", "down", "left"] as const) {
+    const handle = handles[direction];
+    if (
+      handle &&
+      x >= handle[0] &&
+      x <= handle[0] + handle[2] &&
+      y >= handle[1] &&
+      y <= handle[1] + handle[3]
+    ) {
+      return direction;
+    }
+  }
+  return null;
+};
 
 const VERTICAL_OFFSET = 100;
 const HORIZONTAL_OFFSET = 100;
@@ -675,6 +740,13 @@ export class FlowChartCreator {
   isCreatingChart: boolean = false;
   private numberOfNodes: number = 0;
   private direction: LinkDirection | null = null;
+  private startingNodes = new Map<
+    ExcalidrawFlowchartNodeElement["id"],
+    {
+      node: NonDeleted<ExcalidrawFlowchartNodeElement>;
+      boundElements: NonDeleted<ExcalidrawFlowchartNodeElement>["boundElements"];
+    }
+  >();
   // cross-axis anchor of the pending cluster, so growing it keeps the
   // already-visible pending nodes in place
   private clusterCrossStart: number | null = null;
@@ -687,6 +759,13 @@ export class FlowChartCreator {
     scene: Scene,
   ) {
     const elementsMap = scene.getNonDeletedElementsMap();
+
+    if (!this.startingNodes.has(startNode.id)) {
+      this.startingNodes.set(startNode.id, {
+        node: startNode,
+        boundElements: startNode.boundElements,
+      });
+    }
 
     if (direction !== this.direction) {
       this.numberOfNodes = 1;
@@ -736,12 +815,19 @@ export class FlowChartCreator {
     }
   }
 
-  clear() {
+  clear(scene: Scene, restoreStartingNodes = true) {
+    if (restoreStartingNodes) {
+      this.startingNodes.forEach(({ node, boundElements }) => {
+        scene.mutateElement(node, { boundElements });
+      });
+    }
+
     this.isCreatingChart = false;
     this.pendingNodes = null;
     this.direction = null;
     this.numberOfNodes = 0;
     this.clusterCrossStart = null;
+    this.startingNodes.clear();
   }
 }
 

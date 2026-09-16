@@ -262,6 +262,8 @@ import {
   isEligibleFrameChildType,
   getBindingStrategyForDraggingBindingElementEndpoints,
   isNonDeletedElement,
+  isFlowchartNodeElement,
+  getFlowchartHandleDirectionAtCoords,
   DEFAULT_BOUND_TEXT_LABEL_POSITION,
 } from "@excalidraw/element";
 
@@ -800,6 +802,7 @@ class App extends React.Component<AppProps, AppState> {
     [event: PointerEvent | null]
   >();
   onRemoveEventListenersEmitter = new Emitter<[]>();
+  private flowchartPointerDown = false;
 
   api: ExcalidrawImperativeAPI;
   private elementRenderOverrides: ElementRenderOverrides = new Map();
@@ -2745,7 +2748,7 @@ class App extends React.Component<AppProps, AppState> {
                             onClick={this.handleCanvasClick}
                             onPointerMove={this.handleCanvasPointerMove}
                             onPointerUp={this.handleCanvasPointerUp}
-                            onPointerCancel={this.removePointer}
+                            onPointerCancel={this.handleCanvasPointerCancel}
                             onTouchMove={this.handleTouchMove}
                             onPointerDown={this.handleCanvasPointerDown}
                             onDoubleClick={this.handleCanvasDoubleClick}
@@ -8832,7 +8835,10 @@ class App extends React.Component<AppProps, AppState> {
 
     this.clearSelectionIfNotUsingSelection();
 
-    if (this.handleSelectionOnPointerDown(event, pointerDownState)) {
+    if (
+      this.handleSelectionOnPointerDown(event, pointerDownState) &&
+      !pointerDownState.resize.flowchartDirection
+    ) {
       return;
     }
 
@@ -9030,6 +9036,9 @@ class App extends React.Component<AppProps, AppState> {
       pointerDownState,
       event,
     );
+    this.flowchartPointerDown = Boolean(
+      pointerDownState.resize.flowchartDirection,
+    );
 
     if (this.state.activeTool.type === "eraser") {
       this.eraserTrail.startPath(
@@ -9112,6 +9121,15 @@ class App extends React.Component<AppProps, AppState> {
         activeEmbeddable: null,
         selectedElementIds: {},
       });
+    }
+  };
+
+  private handleCanvasPointerCancel = (
+    event: React.PointerEvent<HTMLCanvasElement>,
+  ) => {
+    this.removePointer(event);
+    if (this.flowchartPointerDown) {
+      this.maybeCleanupAfterMissingPointerUp(event.nativeEvent);
     }
   };
 
@@ -9416,6 +9434,7 @@ class App extends React.Component<AppProps, AppState> {
         offset: { x: 0, y: 0 },
         arrowDirection: "origin",
         center: { x: (maxX + minX) / 2, y: (maxY + minY) / 2 },
+        flowchartDirection: null,
       },
       hit: {
         element: null,
@@ -9525,6 +9544,25 @@ class App extends React.Component<AppProps, AppState> {
           this.state.selectedLinearElement.hoverPointIndex !== -1
         )
       ) {
+        const selectedNode = selectedElements[0];
+        if (
+          selectedNode &&
+          isFlowchartNodeElement(selectedNode) &&
+          (selectedNode.type === "rectangle" || selectedNode.type === "diamond")
+        ) {
+          const direction = getFlowchartHandleDirectionAtCoords(
+            selectedNode,
+            this.state.zoom,
+            pointerDownState.origin.x,
+            pointerDownState.origin.y,
+          );
+          if (direction) {
+            pointerDownState.resize.flowchartDirection = direction;
+            this.flowchart.beginPointerCreation(selectedNode, direction);
+            return true;
+          }
+        }
+
         const elementWithTransformHandleType =
           getElementWithTransformHandleType(
             elements,
@@ -10752,6 +10790,14 @@ class App extends React.Component<AppProps, AppState> {
     pointerDownState: PointerDownState,
   ): (event: KeyboardEvent) => void {
     return withBatchedUpdates((event: KeyboardEvent) => {
+      if (
+        pointerDownState.resize.flowchartDirection &&
+        event.key === KEYS.ESCAPE
+      ) {
+        event.preventDefault();
+        this.flowchart.cancelPointerCreation();
+        return;
+      }
       if (this.maybeHandleResize(pointerDownState, event)) {
         return;
       }
@@ -10776,6 +10822,9 @@ class App extends React.Component<AppProps, AppState> {
     pointerDownState: PointerDownState,
   ) {
     return withBatchedUpdatesThrottled((event: PointerEvent) => {
+      if (pointerDownState.resize.flowchartDirection) {
+        return;
+      }
       if (this.state.openDialog?.name === "elementLinkSelector") {
         return;
       }
@@ -11714,6 +11763,47 @@ class App extends React.Component<AppProps, AppState> {
     pointerDownState: PointerDownState,
   ): (event: PointerEvent) => void {
     return withBatchedUpdates((childEvent: PointerEvent) => {
+      if (pointerDownState.resize.flowchartDirection) {
+        this.removePointer(childEvent);
+        if (childEvent.type === "pointerup") {
+          this.flowchart.finishPointerCreation();
+        } else {
+          this.flowchart.cancelPointerCreation();
+        }
+
+        this.flowchartPointerDown = false;
+        pointerDownState.eventListeners.onMove?.flush();
+        this.missingPointerEventCleanupEmitter.clear();
+        this.ownerWindow.removeEventListener(
+          EVENT.POINTER_MOVE,
+          pointerDownState.eventListeners.onMove!,
+        );
+        this.ownerWindow.removeEventListener(
+          EVENT.POINTER_UP,
+          pointerDownState.eventListeners.onUp!,
+        );
+        this.ownerWindow.removeEventListener(
+          EVENT.KEYDOWN,
+          pointerDownState.eventListeners.onKeyDown!,
+        );
+        this.ownerWindow.removeEventListener(
+          EVENT.KEYUP,
+          pointerDownState.eventListeners.onKeyUp!,
+        );
+        this.setState({
+          cursorButton: "up",
+          selectionElement: null,
+          isResizing: false,
+          isRotating: false,
+          isCropping: false,
+          resizingElement: null,
+          selectedElementsAreBeingDragged: false,
+          bindMode: "orbit",
+        });
+        this.savePointer(childEvent.clientX, childEvent.clientY, "up");
+        return;
+      }
+
       const elementsMap = this.scene.getNonDeletedElementsMap();
 
       this.removePointer(childEvent);

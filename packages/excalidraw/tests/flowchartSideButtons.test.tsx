@@ -86,7 +86,7 @@ describe("flowchart side buttons", () => {
         initialData={{ elements: [diamond] }}
       />,
     );
-    const source = h.elements[0]!;
+    const source = h.app.scene.getNonDeletedElements()[0]!;
     API.setSelectedElements([source]);
     fireEvent.click(screen.getByTestId("flowchart-create-right"));
 

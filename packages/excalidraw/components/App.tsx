@@ -217,6 +217,7 @@ import {
   getSelectedGroupIds,
   isElementInGroup,
   isSelectedViaGroup,
+  isFlowchartNodeElement,
   selectGroupsForSelectedElements,
   syncInvalidIndices,
   syncMovedIndices,
@@ -425,6 +426,7 @@ import {
   getViewportForZoomWithScrollConstraints,
 } from "../viewport";
 import { ElementCanvasButtons } from "../components/ElementCanvasButtons";
+import { FlowchartAddStep } from "../components/FlowchartAddStep";
 import { LaserTrails } from "../laserTrails";
 import { withBatchedUpdates, withBatchedUpdatesThrottled } from "../reactUtils";
 import { isPointHittingTextAutoResizeHandle } from "../textAutoResizeHandle";
@@ -2577,6 +2579,19 @@ class App extends React.Component<AppProps, AppState> {
                                       "button",
                                     )
                                   }
+                                />
+                              </ElementCanvasButtons>
+                            )}
+                          {this.isDefaultUIEnabled() &&
+                            selectedElements.length === 1 &&
+                            isFlowchartNodeElement(firstSelectedElement) && (
+                              <ElementCanvasButtons
+                                element={firstSelectedElement}
+                                elementsMap={renderableElementsMap}
+                              >
+                                <FlowchartAddStep
+                                  app={this}
+                                  element={firstSelectedElement}
                                 />
                               </ElementCanvasButtons>
                             )}

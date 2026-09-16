@@ -49,7 +49,7 @@ export class AppFlowchart {
 
   /** ends any in-progress flowchart creation/navigation session */
   clear = () => {
-    this.creator.clear();
+    this.creator.clear(this.app.scene);
     this.navigator.clear();
     this.pointerCreationInProgress = false;
   };
@@ -67,7 +67,7 @@ export class AppFlowchart {
     if (!this.pointerCreationInProgress) {
       return;
     }
-    this.creator.clear();
+    this.creator.clear(this.app.scene);
     this.pointerCreationInProgress = false;
     this.app.triggerRender(true);
   };
@@ -78,7 +78,7 @@ export class AppFlowchart {
     }
 
     const nodes = this.creator.pendingNodes ?? [];
-    this.creator.clear();
+    this.creator.clear(this.app.scene, false);
     this.pointerCreationInProgress = false;
 
     if (nodes.length) {
@@ -142,7 +142,7 @@ export class AppFlowchart {
 
     if (event.type === "keydown") {
       if (event.key === KEYS.ESCAPE && creator.isCreatingChart) {
-        creator.clear();
+        creator.clear(app.scene);
         return { type: "canceled" };
       }
 
@@ -199,7 +199,7 @@ export class AppFlowchart {
 
     if (!event[KEYS.CTRL_OR_CMD] && creator.isCreatingChart) {
       const nodes = creator.pendingNodes ?? [];
-      creator.clear();
+      creator.clear(app.scene, false);
       return { type: "committed", nodes };
     }
 

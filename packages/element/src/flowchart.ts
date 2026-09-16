@@ -740,6 +740,13 @@ export class FlowChartCreator {
   isCreatingChart: boolean = false;
   private numberOfNodes: number = 0;
   private direction: LinkDirection | null = null;
+  private startingNodes = new Map<
+    ExcalidrawFlowchartNodeElement["id"],
+    {
+      node: NonDeleted<ExcalidrawFlowchartNodeElement>;
+      boundElements: NonDeleted<ExcalidrawFlowchartNodeElement>["boundElements"];
+    }
+  >();
   // cross-axis anchor of the pending cluster, so growing it keeps the
   // already-visible pending nodes in place
   private clusterCrossStart: number | null = null;
@@ -752,6 +759,13 @@ export class FlowChartCreator {
     scene: Scene,
   ) {
     const elementsMap = scene.getNonDeletedElementsMap();
+
+    if (!this.startingNodes.has(startNode.id)) {
+      this.startingNodes.set(startNode.id, {
+        node: startNode,
+        boundElements: startNode.boundElements,
+      });
+    }
 
     if (direction !== this.direction) {
       this.numberOfNodes = 1;
@@ -801,12 +815,19 @@ export class FlowChartCreator {
     }
   }
 
-  clear() {
+  clear(scene: Scene, restoreStartingNodes = true) {
+    if (restoreStartingNodes) {
+      this.startingNodes.forEach(({ node, boundElements }) => {
+        scene.mutateElement(node, { boundElements });
+      });
+    }
+
     this.isCreatingChart = false;
     this.pendingNodes = null;
     this.direction = null;
     this.numberOfNodes = 0;
     this.clusterCrossStart = null;
+    this.startingNodes.clear();
   }
 }
 
